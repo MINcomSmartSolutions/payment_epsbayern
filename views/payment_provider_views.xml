@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="payment_provider_form_epsbayern" model="ir.ui.view">
+        <field name="name">payment.provider.form.epsbayern</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='provider_credentials']" position="inside">
+                <group invisible="code != 'epsbayern'">
+                    <div class="alert alert-info" role="alert">
+                        Gateway credentials are configured via environment variables
+                        <code>HM_PAYMENT_GATEWAY_API_USER</code> and
+                        <code>HM_PAYMENT_GATEWAY_API_PW</code>.
+                    </div>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

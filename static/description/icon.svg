@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   id="Ebene_1"
+   x="0px"
+   y="0px"
+   width="997.555px"
+   height="598px"
+   viewBox="0 0 997.555 598"
+   enable-background="new 0 0 997.555 598"
+   xml:space="preserve"
+   sodipodi:docname="bildmarke_weiss.svg"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"><metadata
+   id="metadata27"><rdf:RDF><cc:Work
+       rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+         rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title></dc:title></cc:Work></rdf:RDF></metadata><defs
+   id="defs25"><clipPath
+     clipPathUnits="userSpaceOnUse"
+     id="clipPath39"><rect
+       style="fill:#ffe680"
+       id="rect41"
+       width="603.03931"
+       height="599.67975"
+       x="396.42697"
+       y="-0.83988762" /></clipPath></defs><sodipodi:namedview
+   pagecolor="#ffffff"
+   bordercolor="#666666"
+   borderopacity="1"
+   objecttolerance="10"
+   gridtolerance="10"
+   guidetolerance="10"
+   inkscape:pageopacity="0"
+   inkscape:pageshadow="2"
+   inkscape:window-width="1600"
+   inkscape:window-height="881"
+   id="namedview23"
+   showgrid="false"
+   inkscape:pagecheckerboard="true"
+   inkscape:zoom="1.1906355"
+   inkscape:cx="498.7775"
+   inkscape:cy="299"
+   inkscape:window-x="-4"
+   inkscape:window-y="-4"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Ebene_1" />
+<g
+   id="g20"
+   clip-path="url(#clipPath39)">
+	<g
+   id="g14">
+		<path
+   fill="#FFFFFF"
+   d="M461.085,393.62h65.999c-1.081-12.206-1.242-24.47-0.489-36.696H445.69l42.119-43.944h45.544    c26.359-105.606,121.877-183.86,235.652-183.86c66.786,0,127.301,26.951,171.225,70.59l-24.235,40.718    c-35.288-37.901-80.364-61.626-136.207-61.626c-86.108,0-159.063,56.354-184.007,134.178h305.577l-28.469,43.944H587.167    c-0.387,5.009-0.577,10.03-0.577,15.061c0,7.313,0.409,14.525,1.212,21.636H861.26l-29.192,42.419H597.483    c26.431,75.196,98.072,129.083,182.305,129.083c36.557,0,70.771-10.162,99.934-27.827    c71.619-54.683,117.834-140.96,117.834-238.046C997.555,134.01,863.56,0,698.286,0C532.996,0,399,134.01,399,299.249    c0,48.316,11.446,93.947,31.769,134.345L461.085,393.62L461.085,393.62z"
+   id="path10" />
+		<path
+   fill="#FFFFFF"
+   d="M534.675,436.039H432.009C479.049,527.426,571.736,591.46,679.94,598    C609.322,570.144,554.888,510.154,534.675,436.039L534.675,436.039z"
+   id="path12" />
+	</g>
+	<path
+   fill="#FFFFFF"
+   d="M52.58,494.868c32.543,0,48.194-15.11,48.194-38.28c0-21.628-19.527-37.521-46.887-37.521h-35.17v75.801   H52.58z M34.63,402.161c30.456,0,49.705-15.111,49.705-37.499c0-25.258-17.439-33.061-41.908-33.061h-23.71v70.56H34.63z    M0,511.774V314.666h39.332c36.178,0,64.567,10.409,64.567,49.478c0,19.505-16.403,36.726-32.024,42.186   c20.045,2.592,48.675,19.258,48.675,49.982c0,34.373-23.936,55.463-69.786,55.463H0z"
+   id="path16" />
+	<polygon
+   fill="#FFFFFF"
+   points="143.258,511.774 184.787,430.272 131.792,314.666 151.516,314.666 194.379,412.965    241.289,314.666 260.734,314.666 161.91,511.774  "
+   id="polygon18" />
+</g>
+</svg>

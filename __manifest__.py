@@ -1,0 +1,20 @@
+{
+    'name': 'Payment Provider: ePayServiceBayern',
+    'version': '0.1',
+    'category': 'Accounting/Payment Providers',
+    'author': 'MINcom Smart Solutions GmbH',
+    'sequence': 350,
+    'summary': "ePayServiceBayern Zahlungsabwickler (über die Hochschule München)",
+    'description': "ePayServiceBayern",
+    'depends': ['payment'],
+    'data': [
+        'views/payment_epsbayern_templates.xml',
+        'views/payment_provider_views.xml',
+        'data/payment_method_data.xml',
+        'data/payment_provider_data.xml',
+        'data/payment_cron_data.xml',
+    ],
+    'post_init_hook': 'post_init_hook',
+    'uninstall_hook': 'uninstall_hook',
+    'license': 'LGPL-3',
+}
