@@ -1,15 +1,13 @@
 import logging
-import math
 import pprint
 
 from werkzeug import urls
 
 from odoo import _, fields, models
-from odoo.exceptions import ValidationError
-
-from odoo.addons.payment import utils as payment_utils
 from odoo.addons.payment_epsbayern import const
 from odoo.addons.payment_epsbayern.controllers.main import EPSBayernController
+from odoo.exceptions import ValidationError
+from odoo.addons.payment_epsbayern.utils import _dec, _to_cents, _divide_cents, _sanitize_ref, _add_prefix_to_ref
 
 _logger = logging.getLogger(__name__)
 
@@ -18,6 +16,7 @@ class PaymentTransaction(models.Model):
     _inherit = 'payment.transaction'
 
     epsbayern_txn_id = fields.Char(string="EPS Bayern Transaction ID", readonly=True)
+    epsbayern_sanitized_ref = fields.Char(string="Sanitized Custom Reference", readonly=True)
 
     # Nothing extra needed before rendering
     def _get_specific_processing_values(self, processing_values):
@@ -32,10 +31,13 @@ class PaymentTransaction(models.Model):
         if self.provider_code != const.OUR_PROVIDER_CODE:
             return res
 
+        # Sanitized reference: safe for URLs, cart, and IHV. Prefix to easier identify for HM Finance
+        self.epsbayern_sanitized_ref = _add_prefix_to_ref(_sanitize_ref(self.reference))
+
         base_url = self.provider_id.get_base_url()
         return_url = urls.url_join(
             base_url,
-            '%s?reference=%s' % (EPSBayernController._return_url, urls.url_quote(self.reference))
+            '%s?reference=%s' % (EPSBayernController._return_url, self.epsbayern_sanitized_ref)
         )
 
         # Build cart
@@ -44,18 +46,27 @@ class PaymentTransaction(models.Model):
 
         transaction_data = {
             'wdycf': return_url,
-            'payMethodMask': '',
-            'creditcardMask': '',
+            'payMethodMask': '511',  # FIXME: Test value
+            'creditcardMask': '63',  # FIXME: Test value
             'customerId': str(self.partner_id.id),
-            'useRandomKey': '',
+            # 'useRandomKey': '',
             'cart': cart,
         }
 
+        # TODO: Build hkr?
+
+        ihv_data = self._epsbayern_build_ihv_data()
+        hkr_data = self._epsbayern_build_hkr_data()
+
         payload = {'transaction': transaction_data}
+        payload['hkr'] = hkr_data
+        if ihv_data:
+            payload['ihvV230Data'] = ihv_data
         _logger.info(
             "EPS Bayern createTxn request for tx %s:\n%s",
             self.reference, pprint.pformat(payload)
         )
+
 
         response = self.provider_id._gateway_make_request(
             const.GATEWAY_API_ENDPOINTS['create_txn'], payload=payload
@@ -88,9 +99,62 @@ class PaymentTransaction(models.Model):
             "EPS Bayern createTxn success for tx %s: txnId=%s, redirect=%s",
             self.reference, txn_id, redirect_url
         )
-        
+
         # Sending it to the formview so user can be redirected 
         return {'api_url': redirect_url}
+
+    def _epsbayern_build_ihv_data(self):
+        """Build the IHV V230 data payload for the createTxn request.
+
+        Populates customer fields from the transaction partner and basic
+        accounting metadata. Fields we don't have data for are omitted —
+        the gateway/LFF will use defaults or ignore them.
+        """
+        partner = self.partner_id
+
+        # Split partner name into first/last name
+        # Odoo stores full name in partner.name; try to split sensibly
+        name_parts = (partner.name or '').strip().split(' ', 1)
+        vorname = name_parts[0] if len(name_parts) > 1 else ''
+        nachname = name_parts[1] if len(name_parts) > 1 else name_parts[0]
+
+        # Salutation from partner title or lang
+        anrede = ''
+        if partner.title and partner.title.name:
+            anrede = partner.title.name
+
+        due_date = self.invoice_ids.mapped('invoice_date_due') if self.invoice_ids else None
+        if due_date:
+            # Use the earliest due date among linked invoices, or today if none are set
+            due_date = min(d for d in due_date if d) or fields.Date.today()
+        else:
+            due_date = fields.Date.today()
+
+        ihv_data = {
+            # Customer data
+            # 'kundeAnrede': anrede,
+            'kundeVorname': vorname,
+            'kundeNachname': nachname,
+            # 'kundeStrasse': partner.street or '',
+            # 'kundeAdresszusatz': partner.street2 or '',
+            # 'kundePlz': partner.zip or '',
+            # 'kundeOrt': partner.city or '',
+            # Accounting metadata
+            'haushaltsJahr': due_date.year,
+            'betrag': _to_cents(self.amount),
+            'isoCode': 'DE',  # TODO: Does it needs to change?
+            'verwendungszweck': ('Zahlung %s' % self.epsbayern_sanitized_ref)[:80],
+            'faelligkeit': due_date.strftime('%Y.%m.%d'),
+        }
+
+        return ihv_data
+
+    def _epsbayern_build_hkr_data(self):
+        # FIXME: Test Data
+        return {
+            "accountingKey": "000000000019",
+            "settings": "NO_HKR_EXPORT"
+        }
 
     def _epsbayern_build_cart(self):
         """Build the EPS Bayern cart payload from sale order lines, invoice lines, or transaction amount.
@@ -107,9 +171,9 @@ class PaymentTransaction(models.Model):
             return self._epsbayern_cart_from_sale_orders(self.sale_order_ids)
 
         # 2. Try invoice lines
-        #TODO: I'm not sure about this
+        # TODO: I'm not sure about this
         invoices = self.invoice_ids.filtered(
-            lambda inv: inv.move_type in ('out_invoice', 'out_refund') # Need to look why out_refund?
+            lambda inv: inv.move_type in ('out_invoice', 'out_refund')  # Need to look why out_refund?
         )
         if invoices:
             return self._epsbayern_cart_from_invoices(invoices)
@@ -124,6 +188,7 @@ class PaymentTransaction(models.Model):
         vat_aggregation = {}
         pos_id = 0
 
+        # Iterate sale orders and lines to build cart positions. Skip display_type lines (sections, notes).
         for order in sale_orders:
             for line in order.order_line:
                 if line.display_type:
@@ -133,8 +198,8 @@ class PaymentTransaction(models.Model):
 
                 single_net = _to_cents(line.price_reduce_taxexcl)
                 line_net = _to_cents(line.price_subtotal)
-                line_vat = _to_cents(line.price_tax)
                 line_gross = _to_cents(line.price_total)
+                line_vat = line_gross - line_net
 
                 vat_rate = line.tax_id[0].amount if line.tax_id else 0.0
 
@@ -150,7 +215,7 @@ class PaymentTransaction(models.Model):
                     'vat': vat_rate,
                     'vatAmount': line_vat,
                     'grossAmount': line_gross,
-                    'currency': self.currency_id.name,
+                    'currency': self.currency_id.name or 'EUR',
                 })
 
                 vat_aggregation[vat_rate] = vat_aggregation.get(vat_rate, 0) + line_vat
@@ -190,33 +255,33 @@ class PaymentTransaction(models.Model):
         pos_id = 0
 
         for line in all_product_lines:
-                pos_id += 1
-                qty = float(line.quantity)
+            pos_id += 1
+            qty = float(line.quantity)
 
-                line_net = _to_cents(line.price_subtotal)
-                line_gross = _to_cents(line.price_total)
-                line_vat = line_gross - line_net
-                single_net = _to_cents(line.price_subtotal / qty) if qty else line_net
+            line_net = _to_cents(line.price_subtotal)
+            line_gross = _to_cents(line.price_total)
+            line_vat = line_gross - line_net
+            single_net = _divide_cents(line.price_subtotal, qty) if qty else line_net
 
-                vat_rate = line.tax_ids[0].amount if line.tax_ids else 0.0
-                so_name = line.sale_line_ids[0].order_id.name if line.sale_line_ids else self.reference
+            vat_rate = line.tax_ids[0].amount if line.tax_ids else 0.0
+            so_name = line.sale_line_ids[0].order_id.name if line.sale_line_ids else self.reference
 
-                positions.append({
-                    'posId': pos_id,
-                    'articleRef': so_name[:30],
-                    'articleDesc': (line.name or line.product_id.name or '')[:100],
-                    'content': 1,
-                    'singleNetAmount': single_net,
-                    'number': qty,
-                    'unit': (line.product_uom_id.name or 'Stk')[:30],
-                    'sumNetAmount': line_net,
-                    'vat': vat_rate,
-                    'vatAmount': line_vat,
-                    'grossAmount': line_gross,
-                    'currency': self.currency_id.name,
-                })
+            positions.append({
+                'posId': pos_id,
+                'articleRef': so_name[:30],
+                'articleDesc': (line.name or line.product_id.name or '')[:100],
+                'content': 1,
+                'singleNetAmount': single_net,
+                'number': qty,
+                'unit': (line.product_uom_id.name or 'Stk')[:30],
+                'sumNetAmount': line_net,
+                'vat': vat_rate,
+                'vatAmount': line_vat,
+                'grossAmount': line_gross,
+                'currency': self.currency_id.name or 'EUR',
+            })
 
-                vat_aggregation[vat_rate] = vat_aggregation.get(vat_rate, 0) + line_vat
+            vat_aggregation[vat_rate] = vat_aggregation.get(vat_rate, 0) + line_vat
 
         total_net = sum(_to_cents(inv.amount_untaxed) for inv in invoices)
         total_gross = sum(_to_cents(inv.amount_total) for inv in invoices)
@@ -228,8 +293,8 @@ class PaymentTransaction(models.Model):
         amount_cents = _to_cents(self.amount)
         positions = [{
             'posId': 1,
-            'articleRef': self.reference[:30],
-            'articleDesc': (_("Payment %s", self.reference))[:100],
+            'articleRef': self.epsbayern_sanitized_ref[:30],
+            'articleDesc': (_("Zahlung %s", self.epsbayern_sanitized_ref))[:100],
             'content': 1,
             'singleNetAmount': amount_cents,
             'number': 1,
@@ -238,7 +303,7 @@ class PaymentTransaction(models.Model):
             'vat': 0.0,
             'vatAmount': 0,
             'grossAmount': amount_cents,
-            'currency': self.currency_id.name,
+            'currency': self.currency_id.name or 'EUR',
         }]
         vat_aggregation = {0.0: 0}
         return self._epsbayern_assemble_cart(positions, vat_aggregation, amount_cents, amount_cents)
@@ -254,10 +319,10 @@ class PaymentTransaction(models.Model):
             })
 
         return {
-            'cartRef': self.reference[:30],
+            'cartRef': self.epsbayern_sanitized_ref[:30],
             'totalNetAmount': total_net,
             'totalGrossAmount': total_gross,
-            'currency': self.currency_id.name, # Should be ISO code like 'EUR' and even tough we do not support other currencies, this is dynamic
+            'currency': self.currency_id.name or 'EUR',  # Should be ISO code like 'EUR'
             'arrayOfPositions': positions,
             'arrayOfVatPosition': vat_positions,
         }
@@ -265,7 +330,7 @@ class PaymentTransaction(models.Model):
     # User came back. Find the transaction from notification/return data
     def _get_tx_from_notification_data(self, provider_code, notification_data):
         tx = super()._get_tx_from_notification_data(provider_code, notification_data)
-        if provider_code != const.OUR_PROVIDER_CODE or len(tx) == 1: #Why len(tx) == 1?
+        if provider_code != const.OUR_PROVIDER_CODE or len(tx) == 1:  # Why len(tx) == 1?
             return tx
 
         reference = notification_data.get('reference')
@@ -275,7 +340,7 @@ class PaymentTransaction(models.Model):
             )
 
         tx = self.search([
-            ('reference', '=', reference),
+            ('epsbayern_sanitized_ref', '=', reference),
             ('provider_code', '=', const.OUR_PROVIDER_CODE),
         ])
         if not tx:
@@ -484,8 +549,3 @@ class PaymentTransaction(models.Model):
                 _logger.exception(
                     "EPS Bayern cron: error processing stale tx %s", tx.reference
                 )
-
-
-def _to_cents(amount):
-    """Convert a float amount to integer cents, rounding half-up."""
-    return int(math.floor(amount * 100 + 0.5))

@@ -1,5 +1,6 @@
 import logging
 import os
+import pprint
 
 import requests
 from werkzeug import urls
@@ -80,7 +81,7 @@ class PaymentProvider(models.Model):
         except requests.exceptions.HTTPError:
             _logger.exception("Invalid API request at %s", url)
             raise ValidationError(
-                "EPS Bayern: " + _("The communication with the gateway failed.")
+                "EPS Bayern: " + _("The communication with the gateway failed. %s", pprint.pformat(response.json()))
             )
         return response.json()
 
