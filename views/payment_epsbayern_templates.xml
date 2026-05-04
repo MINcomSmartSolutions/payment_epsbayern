@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Redirect form: submits a GET to the EPS Bayern paypage URL (which already contains ?txnid=...) -->
+    <!-- Redirect form: submits a GET to the EPS Bayern paypage URL with txnid as query param -->
     <template id="redirect_form">
         <form t-att-action="api_url" method="get"/>
+        <form t-att-action="api_url" method="get">
+            <input type="hidden" name="txnid" t-att-value="txnid"/>
+        </form>
+    </template>
     </template>
 
 </odoo>

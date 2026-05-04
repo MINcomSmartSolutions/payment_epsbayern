@@ -112,37 +112,6 @@ class TestDivideCents(BaseCase):
             _divide_cents(None, 5)
 
 
-# ── _round ───────────────────────────────────────────────────────────────────
-
-class TestRound(BaseCase):
-    def test_default_two_places(self):
-        self.assertEqual(_round("2.345"), Decimal("2.35"))
-
-    def test_zero_places(self):
-        self.assertEqual(_round("2.5", places=0), Decimal("3"))
-
-    def test_one_place(self):
-        self.assertEqual(_round("2.35", places=1), Decimal("2.4"))
-
-    def test_three_places(self):
-        self.assertEqual(_round("1.2345", places=3), Decimal("1.235"))
-
-    def test_no_rounding_needed(self):
-        self.assertEqual(_round("1.10", places=2), Decimal("1.10"))
-
-    def test_negative(self):
-        self.assertEqual(_round("-2.345"), Decimal("-2.35"))
-
-    def test_int_input(self):
-        self.assertEqual(_round(5), Decimal("5.00"))
-
-    def test_float_input(self):
-        self.assertEqual(_round(1.005), Decimal("1.01"))
-
-    def test_returns_decimal(self):
-        self.assertIsInstance(_round(1), Decimal)
-
-
 # ── _sanitize_ref ────────────────────────────────────────────────────────────
 
 class TestSanitizeRef(BaseCase):

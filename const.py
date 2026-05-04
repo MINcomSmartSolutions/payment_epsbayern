@@ -2,7 +2,7 @@ import logging
 import os
 _logger = logging.getLogger(__name__)
 
-OUR_PROVIDER_CODE = 'epsbayern' # Do not change it! Here for the easy access, not for the config.
+EPSBAYERN_PROVIDER_CODE = 'epsbayern' # Do not change it! Here for the easy access, not for the config.
 
 SUPPORTED_CURRENCIES = (
     'EUR',
@@ -19,6 +19,12 @@ GATEWAY_API_BASE_URL = {
     #TODO: Change 'enabled' to prod url or env variable
     'enabled': os.environ.get('EPS_BAYERN_PROD_GATEWAY_API_BASE_URL'),
     'test': os.environ.get('EPS_BAYERN_TEST_GATEWAY_API_BASE_URL'),
+}
+
+EPS_BASE_URLS = { # to validate redirection
+    # TODO: Change 'enabled' to prod url or env variable
+    'enabled': os.environ.get('EPS_BAYERN_PROD_EPS_BASE_URL', ''),
+    'test': os.environ.get('EPS_BAYERN_TEST_EPS_BASE_URL', ''),
 }
 
 if GATEWAY_API_BASE_URL['test'].startswith('http://') or GATEWAY_API_BASE_URL['enabled'].startswith('http://'):
@@ -58,6 +64,7 @@ PAYMENT_STATUS_MAPPING = {
         'ABBRUCH_OK',
     },
     'error': {
+        'RESERVIERUNG_FEHLSCHLAG',
         'BUCHUNG_NICHT_OK',
         'RESERVIERUNG_NICHT_OK',
         'IHV_NICHT_OK',
@@ -68,3 +75,5 @@ PAYMENT_STATUS_MAPPING = {
 
 # Timeout in minutes after which pending transactions are considered stale
 STALE_TRANSACTION_TIMEOUT_MINUTES = 60
+# Timeout in hours after which pending transactions are considered stale
+STALE_TRANSACTION_TIMEOUT_HOURS = 48
