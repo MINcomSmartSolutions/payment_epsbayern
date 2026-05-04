@@ -630,8 +630,44 @@ class PaymentTransaction(models.Model):
                     )
             except Exception:
                 _logger.exception(
-                    "EPS Bayern cron: error processing stale tx %s", tx.reference
-                )
                     "EPS Bayern cron: error processing stale reference %s, txn id:", tx.reference, tx.provider_reference
                 )
 
+    # Internal action: fetch detailed transaction status
+    def action_fetch_txn_status_detail(self):
+        """Fetch the detailed transaction status from the EPS Bayern gateway and show in a wizard."""
+        self.ensure_one()
+
+        if self.provider_code != const.EPSBAYERN_PROVIDER_CODE:
+            raise ValidationError(_("This action is only available for EPS Bayern transactions."))
+
+        if not self.provider_reference:
+            raise ValidationError(
+                _("Cannot fetch status: this transaction has no gateway reference (txnId).")
+            )
+
+        txn_id = int(self.provider_reference)
+
+        response = self.provider_id._gateway_make_request(
+            const.GATEWAY_API_ENDPOINTS['get_txn_status_detail'],
+            payload={'txnId': txn_id}
+        )
+
+        _logger.info(
+            "EPS Bayern: fetched detailed status for tx %s (txnId=%s)",
+            self.reference, txn_id
+        )
+
+        wizard = self.env['payment.epsbayern.txn.status.detail.wizard'].create({
+            'transaction_id': self.id,
+            'status_detail_json': json.dumps(response, indent=2, ensure_ascii=False),
+        })
+
+        return {
+            'name': _('Transaction Status Detail — %s', self.reference),
+            'type': 'ir.actions.act_window',
+            'res_model': 'payment.epsbayern.txn.status.detail.wizard',
+            'res_id': wizard.id,
+            'view_mode': 'form',
+            'target': 'new',
+        }

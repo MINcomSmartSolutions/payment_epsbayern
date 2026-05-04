@@ -73,7 +73,5 @@ PAYMENT_STATUS_MAPPING = {
     },
 }
 
-# Timeout in minutes after which pending transactions are considered stale
-STALE_TRANSACTION_TIMEOUT_MINUTES = 60
 # Timeout in hours after which pending transactions are considered stale
 STALE_TRANSACTION_TIMEOUT_HOURS = 48
