@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="payment_epsbayern_txn_status_detail_wizard_form" model="ir.ui.view">
+        <field name="name">payment.epsbayern.txn.status.detail.wizard.form</field>
+        <field name="model">payment.epsbayern.txn.status.detail.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Transaction Status Detail">
+                <group>
+                    <field name="transaction_id" readonly="1"/>
+                </group>
+                <separator string="Gateway Response"/>
+                <field name="status_detail_json" widget="code" readonly="1" nolabel="1"/>
+                <footer>
+                    <button string="Close" class="btn-primary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>
