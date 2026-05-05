@@ -6,11 +6,11 @@
         <field name="model">payment.transaction</field>
         <field name="inherit_id" ref="payment.payment_transaction_form"/>
         <field name="arch" type="xml">
-            <!-- Add "Fetch Status Detail" button in the header -->
+            <!-- Add "See Detailed Timeline" button in the header -->
             <xpath expr="//header" position="inside">
                 <button name="action_fetch_txn_status_detail"
                         type="object"
-                        string="Fetch Status Detail"
+                        string="See Detailed Timeline"
                         class="btn-secondary"
                         invisible="provider_code != 'epsbayern' or not provider_reference"
                         groups="base.group_system"/>
@@ -19,4 +19,3 @@
     </record>
 
 </odoo>
-    

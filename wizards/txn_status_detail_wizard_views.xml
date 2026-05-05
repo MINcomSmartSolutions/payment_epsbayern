@@ -9,7 +9,7 @@
                 <group>
                     <field name="transaction_id" readonly="1"/>
                 </group>
-                <separator string="Gateway Response"/>
+                <separator string="EPS Response"/>
                 <field name="status_detail_json" widget="code" readonly="1" nolabel="1"/>
                 <footer>
                     <button string="Close" class="btn-primary" special="cancel"/>
