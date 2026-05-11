@@ -2,11 +2,13 @@ import logging
 import os
 _logger = logging.getLogger(__name__)
 
-EPSBAYERN_PROVIDER_CODE = 'epsbayern' # Do not change it! Here for the easy access, not for the config.
+# DO NOT CHANGE IT! Here for the easy access, not for the config.
+EPSBAYERN_PROVIDER_CODE = 'epsbayern'
 
-SUPPORTED_CURRENCIES = (
+SUPPORTED_CURRENCIES = [
     'EUR',
-)
+]
+
 SUPPORTED_COUNTRIES = {
     'DE'
 }
@@ -75,3 +77,5 @@ PAYMENT_STATUS_MAPPING = {
 
 # Timeout in hours after which pending transactions are considered stale
 STALE_TRANSACTION_TIMEOUT_HOURS = 48
+if os.getenv('ODOO_ENV', 'dev') == 'dev':
+    STALE_TRANSACTION_TIMEOUT_HOURS = 1
