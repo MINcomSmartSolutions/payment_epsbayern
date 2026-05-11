@@ -28,7 +28,7 @@ class PaymentTransaction(models.Model):
             return res
         return {}
 
-    # Build cart, call createTxn, return redirect URL 
+    # Build cart, call createTxn, return redirect URL
     def _get_specific_rendering_values(self, processing_values):
         res = super()._get_specific_rendering_values(processing_values)
         if self.provider_code != const.EPSBAYERN_PROVIDER_CODE:
@@ -139,25 +139,34 @@ class PaymentTransaction(models.Model):
         nachname = name_parts[1] if len(name_parts) > 1 else name_parts[0]
 
         # Salutation from partner title or lang
-        anrede = ''
+        anrede = ""
         if partner.title and partner.title.name:
             anrede = partner.title.name
 
+        today = fields.Date.today()
         due_date = self.invoice_ids.mapped('invoice_date_due') if self.invoice_ids else None
+        # Use the latest due date among linked invoices, or in 1 month if none are set
         if due_date:
-            # Use the earliest due date among linked invoices, or today if none are set
-            due_date = min(d for d in due_date if d) or fields.Date.today()
+            due_date = max(d for d in due_date if d) or fields.Date.add(today, months=1)
         else:
-            due_date = fields.Date.today()
+            due_date = fields.Date.add(today, months=1)
 
+        invoice_date = self.invoice_ids.mapped('invoice_date') if self.invoice_ids else None
+        if invoice_date:
+            invoice_date = max(d for d in invoice_date if d) or today
+        else:
+            invoice_date = today
+
+        # noinspection DuplicatedCode
         ihv_data = {
             # FIXME: Test data
-            'haushaltsJahr': str(due_date.year),
+            'haushaltsJahr': str(invoice_date.year),
             'haushaltsKennz': "001",
             "kapitel": "1234",
             "titel": "1234",
             "titelKennz": "0",
             "mahnSchluessel": "01",
+            'anrede': anrede,
             'kundeVorname': vorname,
             'kundeNachname': nachname,
             "anordnungsStellenNr": "1234567",
@@ -179,9 +188,9 @@ class PaymentTransaction(models.Model):
             "kundePlz": "12345",
             "kundeOrt": "Musterstadt",
             "feststeller": "Administrator",
-            # Accounting metadata #TODO: Needs clarification form julian or/and HM Finance
+            # Accounting metadata #TODO: Needs clarification from julian or/and HM Finance
             'betrag': str(self.amount),  # in euros
-            'isoCode': 'DE',  # TODO: Does it needs to change?
+            'isoCode': 'DE',
             'verwendungszweck': ('Zahlung %s' % self.epsbayern_sanitized_ref)[:80],
             'faelligkeit': due_date.strftime('%d.%m.%Y'),
             "externAnordnungsBefugter": "01uni-musterstadt.mueller",
@@ -215,7 +224,7 @@ class PaymentTransaction(models.Model):
     def _epsbayern_build_hkr_data(self):
         # FIXME: Test Data
         return {
-            "accountingKey": "000000000019",
+            "accountingKey": "000000000019", #Buchungskennzeichen
             "settings": "NO_HKR_EXPORT"
         }
 
@@ -261,7 +270,9 @@ class PaymentTransaction(models.Model):
 
         # Fallback: transaction has no linked sale orders or invoices (or they have
         # no product lines). Treat the full transaction amount as a single 0%-VAT
-        # position. This should not happen in the normal portal flow.
+        # position. We are not able to get the tax rates etc. This should not happen in our use case,
+        # but could happen somewhere else.
+        # FIXME: Any way to get the tax rate of what is being paid?
         if not buckets:
             gross_cents = _to_cents(self.amount)
             buckets[0.0] = {'net': gross_cents, 'vat': 0, 'gross': gross_cents}
@@ -311,8 +322,8 @@ class PaymentTransaction(models.Model):
             return tx
 
         reference = notification_data.get('reference')
-        eps_txnid = notification_data.get('eps_txnid')  # on return from payment, it gives txnid in query param and
-        # forwarded here by
+        eps_txnid = notification_data.get('eps_txnid')  # on return from payment, it gives txnid in query param but
+        # not crucial here since we have the reference to match
         if not reference:
             raise ValidationError(
                 "EPS Bayern: " + _("Received data with missing reference.")
@@ -354,12 +365,17 @@ class PaymentTransaction(models.Model):
         if self.provider_code != const.EPSBAYERN_PROVIDER_CODE:
             return
 
+        if not notification_data:
+            raise ValidationError(
+                "EPS Bayern: " + _("Received empty notification data for reference %s.", self.reference)
+            )
+
         if not self.provider_reference:
             raise ValidationError(
                 "EPS Bayern: " + _("Transaction %s has no provider reference (txnId).", self.reference)
             )
 
-        txn_id = int(self.provider_reference)
+        txn_id = self.provider_reference
 
         # Query current transaction status
         status_response = self.provider_id._gateway_make_request(
@@ -445,10 +461,16 @@ class PaymentTransaction(models.Model):
                 "EPS Bayern: " + _("Capture request failed. Please check logs.")
             )
 
-    # Handle refund requests from Odoo backend 
-    # TODO: Needs testing
     def _send_refund_request(self, amount_to_refund=None):
-        """Send a full refund (RETURN) via execute endpoint."""
+        """
+            Prepare and send a refund request.
+            Reverses the invoice/s after successfull refund so the refund has proper accounting documents.
+            The outbound payment will reconcile against the credit note.
+                Two types of Stornierungen:
+                1. Cancel (storno) VOID the entire transaction - This is free of charge, but only possible before the payment
+                register is finalized
+                2. Return (reverse) the entire transaction - This costs a fee
+        """
         refund_tx = super()._send_refund_request(amount_to_refund=amount_to_refund)
         if self.provider_code != const.EPSBAYERN_PROVIDER_CODE:
             return refund_tx
@@ -458,17 +480,12 @@ class PaymentTransaction(models.Model):
                 "EPS Bayern: " + _("Cannot refund: source transaction has no provider reference.")
             )
 
-        txn_id = int(self.provider_reference)
+        txn_id = self.provider_reference
 
         _logger.info(
             "EPS Bayern refund for reference %s, source txnId=%s",
             self.reference, txn_id
         )
-
-        # Two types of Stornierungen:
-        # 1. Cancel (storno) VOID the entire transaction - This is free of charge, but only possible before the payment
-        # register is finalized
-        # 2. Return (reverse) the entire transaction - This costs a fee
 
         _logger.info(
             "EPS Bayern attempting CANCEL (storno) for tx %s, source txnId=%s",
@@ -526,9 +543,12 @@ class PaymentTransaction(models.Model):
         # Create a credit note (reversal) for the source invoices so the refund
         # has proper accounting documents. The outbound payment will reconcile
         # against the credit note.
+        # NOTE: In this point even tough we do not depend on "account" package, if source invoices are present
+        # the account module should be already installed, and we do reversal on them
         source_invoices = self.invoice_ids.filtered(
             lambda inv: inv.state == 'posted' and inv.move_type == 'out_invoice'
-        )
+        ) if self.invoice_ids else None
+
         if source_invoices:
             reversal_wizard = self.env['account.move.reversal'].with_context(
                 active_model='account.move',
@@ -546,9 +566,7 @@ class PaymentTransaction(models.Model):
                     credit_notes.mapped('name'), refund_tx.reference
                 )
 
-        refund_tx._set_done(
-            state_message=_("Refund processed via %s", refund_method)
-        )
+        refund_tx._set_done()
 
         # Trigger post-processing immediately since the gateway response is synchronous.
         # This creates the account.payment (outbound) and reconciles against the credit note.
@@ -643,7 +661,7 @@ class PaymentTransaction(models.Model):
 
         if not self.provider_reference:
             raise ValidationError(
-                _("Cannot fetch status: this transaction has no gateway reference (txnId).")
+                _("Cannot fetch status: this transaction has no provider reference (txnId).")
             )
 
         txn_id = int(self.provider_reference)
