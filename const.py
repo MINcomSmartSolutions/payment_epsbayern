@@ -14,6 +14,8 @@ SUPPORTED_COUNTRIES = {
 }
 
 DEFAULT_PAYMENT_METHOD_CODES = {
+    # Actually it is; paypal, visa, mastercard, sepa, but the diffrantiate is not needed for odoo and would be over
+    # engineered
     'epsbayern',
 }
 
@@ -64,9 +66,12 @@ PAYMENT_STATUS_MAPPING = {
     'cancel': {
         'STORNO_OK',
         'ABBRUCH_OK',
+        'REDIRECT_PAYPAGE_ABBRUCH',
+        'RESERVIERUNG_ABBRUCH'
     },
     'error': {
-        'RESERVIERUNG_FEHLSCHLAG',
+        'RESERVIERUNG_FEHLSCHLAG', # This can also be "cancel" but hard to say whether the txn was canceled by user or
+        # something went wrong
         'BUCHUNG_NICHT_OK',
         'RESERVIERUNG_NICHT_OK',
         'IHV_NICHT_OK',

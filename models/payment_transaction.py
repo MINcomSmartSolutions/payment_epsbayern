@@ -48,7 +48,6 @@ class PaymentTransaction(models.Model):
             )
         )
 
-        # Build cart
         cart = self._epsbayern_build_cart()
         _logger.debug("EPS Bayern cart for tx %s: %s", self.reference, pprint.pformat(cart))
 
@@ -61,10 +60,7 @@ class PaymentTransaction(models.Model):
         ihv_data = self._epsbayern_build_ihv_data()
         hkr_data = self._epsbayern_build_hkr_data()
 
-        payload = {'transaction': transaction_data}
-        payload['hkr'] = hkr_data
-        if ihv_data:
-            payload['ihvV230Data'] = ihv_data
+        payload = {'transaction': transaction_data, 'hkr': hkr_data, 'ihvV230Data': ihv_data}
 
         _logger.info(
             "EPS Bayern createTxn request for tx %s:\n%s",
@@ -131,17 +127,19 @@ class PaymentTransaction(models.Model):
         the gateway does not use defaults or not ignore them.
         """
         partner = self.partner_id
+        company_partner = self.company_id.partner_id
 
         # Split partner name into first/last name
         # Odoo stores full name in partner.name; try to split sensibly
-        name_parts = (partner.name or '').strip().split(' ', 1)
+        name_parts = (partner.name).strip().split(' ', 1)
         vorname = name_parts[0] if len(name_parts) > 1 else ''
         nachname = name_parts[1] if len(name_parts) > 1 else name_parts[0]
 
-        # Salutation from partner title or lang
-        anrede = ""
-        if partner.title and partner.title.name:
-            anrede = partner.title.name
+        # Prefer customer address; fallback to company address when missing.
+        kunde_strasse = (partner.street or company_partner.street or '').strip()[:50]
+        kunde_plz = (partner.zip or company_partner.zip or '').strip()[:6]
+        kunde_ort = (partner.city or company_partner.city or '').strip()[:50]
+        kunde_adresszusatz = (partner.street2 or company_partner.street2 or '').strip()[:75]
 
         today = fields.Date.today()
         due_date = self.invoice_ids.mapped('invoice_date_due') if self.invoice_ids else None
@@ -159,41 +157,39 @@ class PaymentTransaction(models.Model):
 
         # noinspection DuplicatedCode
         ihv_data = {
-            # FIXME: Test data
             'haushaltsJahr': str(invoice_date.year),
-            'haushaltsKennz': "001",
-            "kapitel": "1234",
-            "titel": "1234",
+            "haushaltsKennz": "000",
+            "kapitel": "0000",
+            "titel": "00000",
             "titelKennz": "0",
-            "mahnSchluessel": "01",
-            'anrede': anrede,
-            'kundeVorname': vorname,
-            'kundeNachname': nachname,
-            "anordnungsStellenNr": "1234567",
-            "anordnungsStellenUnterNr": "1234567",
+            "mahnSchluessel": "11",
+            "schluesselKleinbetrag": "01",
+            "schluesselVerzugszins": "0",
+            "anrede": "",
+            "anordnungsStellenNr": "0000000",
+            "anordnungsStellenUnterNr": "0000000",
             "ebene1": "",
             "ebene2": "",
             "ebene3": "",
             "sonstAngabenZp": "",
             "budgetNr": "",
             "interneNotiz": "",
-            "schluesselKleinbetrag": "00",
-            "schluesselVerzugszins": "0",
             "blzLastschrift": "",
             "kontoNrLastschrift": "",
+            "feststeller": "Administrator",
+            'kundeVorname': vorname,
+            'kundeNachname': nachname,
             "kundeAnrede": "",
             "kundeTitel": "",
-            "kundeStrasse": "Musterstraße 1",
-            "kundeAdresszusatz": "",
-            "kundePlz": "12345",
-            "kundeOrt": "Musterstadt",
-            "feststeller": "Administrator",
-            # Accounting metadata #TODO: Needs clarification from julian or/and HM Finance
+            "kundeStrasse": kunde_strasse,
+            "kundeAdresszusatz": kunde_adresszusatz,
+            "kundePlz": kunde_plz,
+            "kundeOrt": kunde_ort,
             'betrag': str(self.amount),  # in euros
             'isoCode': 'DE',
             'verwendungszweck': ('Zahlung %s' % self.epsbayern_sanitized_ref)[:80],
             'faelligkeit': due_date.strftime('%d.%m.%Y'),
-            "externAnordnungsBefugter": "01uni-musterstadt.mueller",
+            "externAnordnungsBefugter": "",
             "immobiliennummer": "",
             "klrStatus": "N",
             "rechnungErforderlich": "N",
@@ -222,9 +218,8 @@ class PaymentTransaction(models.Model):
         return ihv_data
 
     def _epsbayern_build_hkr_data(self):
-        # FIXME: Test Data
         return {
-            "accountingKey": "000000000019", #Buchungskennzeichen
+            "accountingKey": "000000000019",  # Buchungskennzeichen
             "settings": "NO_HKR_EXPORT"
         }
 
@@ -340,8 +335,8 @@ class PaymentTransaction(models.Model):
 
         if eps_txnid:
             try:
-                returned_id = int(eps_txnid)
-                stored_id = int(tx.provider_reference)
+                returned_id = eps_txnid
+                stored_id = tx.provider_reference
             except (ValueError, TypeError):
                 raise ValidationError(
                     "EPS Bayern: " + _("Invalid txnId format. Ref: %s, txnId: %s", reference, eps_txnid)
@@ -492,7 +487,7 @@ class PaymentTransaction(models.Model):
             self.reference, txn_id
         )
 
-        # First try to cancel it (free of charge, only works before register is finalized)
+        # First try to cancel it
         refund_method = None
         try:
             cancel_response = self.provider_id._gateway_make_request(
@@ -527,10 +522,10 @@ class PaymentTransaction(models.Model):
             return_status = base_response.get('returnStatus', {})
 
             if not _successfull_return_status(return_status):
-                # Throw so further the refund can not be processed
+                # Throw, so further the refund can not be processed
                 raise ValidationError(
                     "EPS Bayern: " + _(
-                        "Refund (RETURN) failed: %s", pprint.pformat(refund_response)
+                        "Refund (RETURN) also failed: %s", pprint.pformat(refund_response)
                     )
                 )
             refund_method = 'RETURN'
@@ -574,7 +569,7 @@ class PaymentTransaction(models.Model):
 
         return refund_tx
 
-    # --- Cron: check stale pending transactions ---
+    # Cron: check stale pending transactions
     def _cron_epsbayern_check_stale_transactions(self):
         """Check pending EPS Bayern transactions and update their status."""
         timeout = const.STALE_TRANSACTION_TIMEOUT_HOURS
@@ -593,7 +588,7 @@ class PaymentTransaction(models.Model):
 
         for tx in stale_txs:
             try:
-                txn_id = int(tx.provider_reference)
+                txn_id = tx.provider_reference
                 status_response = tx.provider_id._gateway_make_request(
                     const.GATEWAY_API_ENDPOINTS['get_txn_status'],
                     payload={'txnId': txn_id}
@@ -633,7 +628,6 @@ class PaymentTransaction(models.Model):
                         tx.reference, txn_id, status_desc
                     )
                     try:
-                        # TODO: Check if it is already aborted before trying?
                         tx.provider_id._gateway_make_request(
                             const.GATEWAY_API_ENDPOINTS['abort_txn'],
                             payload={'txnId': txn_id}
@@ -664,7 +658,7 @@ class PaymentTransaction(models.Model):
                 _("Cannot fetch status: this transaction has no provider reference (txnId).")
             )
 
-        txn_id = int(self.provider_reference)
+        txn_id = self.provider_reference
 
         response = self.provider_id._gateway_make_request(
             const.GATEWAY_API_ENDPOINTS['get_txn_status_detail'],
