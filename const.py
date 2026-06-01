@@ -25,7 +25,7 @@ GATEWAY_API_BASE_URL = {
 }
 
 EPS_BASE_URLS = { # to validate redirection
-    'enabled':  'https://epayservice-itdlz.bayern.de',
+    'enabled':  'https://epayservice.bayern.de',
     'test': 'https://epayservice-test-itdlz.bayern.de',
 }
 

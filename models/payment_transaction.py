@@ -91,8 +91,8 @@ class PaymentTransaction(models.Model):
 
         # Validate redirect URL
         allowed_bases = (
-            const.EPS_BASE_URLS.get('enabled', ''),
-            const.EPS_BASE_URLS.get('test', ''),
+            const.EPS_BASE_URLS.get('enabled'),
+            const.EPS_BASE_URLS.get('test'),
         )
         if not any(url_to_paypage.startswith(base) for base in allowed_bases if base):
             raise ValidationError(
