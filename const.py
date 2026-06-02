@@ -14,8 +14,7 @@ SUPPORTED_COUNTRIES = {
 }
 
 DEFAULT_PAYMENT_METHOD_CODES = {
-    # Actually it is; paypal, visa, mastercard, sepa, but the diffrantiate is not needed for odoo and would be over
-    # engineered
+    # Actually it is; paypal, visa, mastercard, sepa, but the diffrantiate is not needed
     'epsbayern',
 }
 

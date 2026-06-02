@@ -132,8 +132,8 @@ class PaymentTransaction(models.Model):
         # Split partner name into first/last name
         # Odoo stores full name in partner.name; try to split sensibly
         name_parts = (partner.name).strip().split(' ', 1)
-        vorname = name_parts[0] if len(name_parts) > 1 else ''
-        nachname = name_parts[1] if len(name_parts) > 1 else name_parts[0]
+        kunde_vorname = name_parts[0] if len(name_parts) > 1 else ''
+        kunde_nachname = name_parts[1] if len(name_parts) > 1 else name_parts[0]
 
         # Prefer customer address; fallback to company address when missing.
         kunde_strasse = (partner.street or company_partner.street or '').strip()[:50]
@@ -155,9 +155,17 @@ class PaymentTransaction(models.Model):
         else:
             invoice_date = today
 
+        # If invoice date is dated october, November, December take the next year as haushaltsJahr.
+        # Since their payment could/should belong to the next year
+        if invoice_date.month in (10, 11, 12):
+            haushaltsJahr = invoice_date.year + 1
+        else:
+            haushaltsJahr = invoice_date.year
+
+
         # noinspection DuplicatedCode
         ihv_data = {
-            'haushaltsJahr': str(invoice_date.year),
+            'haushaltsJahr': str(haushaltsJahr),
             "haushaltsKennz": "000",
             "kapitel": "0000",
             "titel": "00000",
@@ -176,9 +184,9 @@ class PaymentTransaction(models.Model):
             "interneNotiz": "",
             "blzLastschrift": "",
             "kontoNrLastschrift": "",
-            "feststeller": "Administrator",
-            'kundeVorname': vorname,
-            'kundeNachname': nachname,
+            "feststeller": "Ladeabrechnung",
+            'kundeVorname': f'{kunde_nachname},{kunde_vorname}',
+            'kundeNachname': f'{self.epsbayern_sanitized_ref}{kunde_nachname},{kunde_vorname}',
             "kundeAnrede": "",
             "kundeTitel": "",
             "kundeStrasse": kunde_strasse,
@@ -187,7 +195,7 @@ class PaymentTransaction(models.Model):
             "kundeOrt": kunde_ort,
             'betrag': str(self.amount),  # in euros
             'isoCode': 'DE',
-            'verwendungszweck': ('Zahlung %s' % self.epsbayern_sanitized_ref)[:80],
+            'verwendungszweck': ('Ladeabrechnung Zahlung %s' % self.epsbayern_sanitized_ref)[:80],
             'faelligkeit': due_date.strftime('%d.%m.%Y'),
             "externAnordnungsBefugter": "",
             "immobiliennummer": "",
@@ -219,7 +227,7 @@ class PaymentTransaction(models.Model):
 
     def _epsbayern_build_hkr_data(self):
         return {
-            "accountingKey": "000000000019",  # Buchungskennzeichen
+            "accountingKey": "202400000142",  # Buchungskennzeichen
             "settings": "NO_HKR_EXPORT"
         }
 
