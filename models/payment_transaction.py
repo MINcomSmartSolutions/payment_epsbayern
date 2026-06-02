@@ -149,23 +149,9 @@ class PaymentTransaction(models.Model):
         else:
             due_date = fields.Date.add(today, months=1)
 
-        invoice_date = self.invoice_ids.mapped('invoice_date') if self.invoice_ids else None
-        if invoice_date:
-            invoice_date = max(d for d in invoice_date if d) or today
-        else:
-            invoice_date = today
-
-        # If invoice date is dated october, November, December take the next year as haushaltsJahr.
-        # Since their payment could/should belong to the next year
-        if invoice_date.month in (10, 11, 12):
-            haushaltsJahr = invoice_date.year + 1
-        else:
-            haushaltsJahr = invoice_date.year
-
-
         # noinspection DuplicatedCode
         ihv_data = {
-            'haushaltsJahr': str(haushaltsJahr),
+            'haushaltsJahr': str(due_date.year),
             "haushaltsKennz": "000",
             "kapitel": "0000",
             "titel": "00000",
