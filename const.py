@@ -19,7 +19,7 @@ DEFAULT_PAYMENT_METHOD_CODES = {
 }
 
 GATEWAY_API_BASE_URL = {
-    'enabled': os.environ.get('EPS_BAYERN_PROD_GATEWAY_API_BASE_URL', 'https://epaybs-gateway.it.admin.edu'),
+    'enabled': os.environ.get('EPS_BAYERN_PROD_GATEWAY_API_BASE_URL', 'https://epaybs-gateway.it.admin.hm.edu'),
     'test': os.environ.get('EPS_BAYERN_TEST_GATEWAY_API_BASE_URL', 'https://epaybs-gateway-stage.it.admin.hm.edu'),
 }
 
