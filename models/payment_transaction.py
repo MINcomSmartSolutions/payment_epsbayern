@@ -259,9 +259,8 @@ class PaymentTransaction(models.Model):
 
         # Fallback: transaction has no linked sale orders or invoices (or they have
         # no product lines). Treat the full transaction amount as a single 0%-VAT
-        # position. We are not able to get the tax rates etc. This should not happen in our use case,
-        # but could happen somewhere else.
-        # FIXME: Any way to get the tax rate of what is being paid?
+        # position. We are not able to get the tax rates etc. This should not happen in our use case.
+        # For this case, the vat rate is not fetchable and will be lost!
         if not buckets:
             gross_cents = _to_cents(self.amount)
             buckets[0.0] = {'net': gross_cents, 'vat': 0, 'gross': gross_cents}
